@@ -1,20 +1,35 @@
-
 import os
-from flask import Flask, jsonify, send_from_directory
 import psycopg2
 from psycopg2.extras import RealDictCursor
+from flask import Flask, jsonify, send_from_directory
 from flask_cors import CORS
+import re
 
 app = Flask(__name__, static_folder='.', static_url_path='')
-CORS(app) # Allows the frontend to communicate with the backend
+CORS(app)
 
 def get_db_connection():
-    """Establishes a connection to the database."""
-    # Use DATABASEURL key, which was corrected for Render
-    conn = psycopg2.connect(os.environ.get('DATABASEURL'))
-    return conn
+    """Establishes a connection to the database using the external URL."""
+    db_url = os.environ.get('DATABASEURL')
+    
+    # This part correctly parses the URL for the database library
+    pattern = re.compile(r"postgresql://(?P<user>.+?):(?P<password>.+?)@(?P<host>.+?):(?P<port>\d+?)/(?P<dbname>.+)")
+    match = pattern.match(db_url)
+    
+    if match:
+        db_params = match.groupdict()
+        conn = psycopg2.connect(
+            dbname=db_params['dbname'],
+            user=db_params['user'],
+            password=db_params['password'],
+            host=db_params['host'],
+            port=db_params['port']
+        )
+        return conn
+    else:
+        raise ValueError("Invalid DATABASEURL format")
 
-# API ROUTES
+# API ROUTES (These are unchanged)
 @app.route('/api/subjects', methods=['GET'])
 def get_subjects():
     conn = get_db_connection()
@@ -78,14 +93,13 @@ def get_essay_details(essay_id):
     conn.close()
     return jsonify(essay)
 
-# SERVE THE FRONTEND
+# SERVE THE FRONTEND (These are unchanged)
 @app.route('/')
 def serve_index():
     return send_from_directory('.', 'index.html')
 
 @app.route('/<path:path>')
 def serve_static(path):
-    # This will serve style.css and script.js
     return send_from_directory('.', path)
 
 if __name__ == '__main__':
