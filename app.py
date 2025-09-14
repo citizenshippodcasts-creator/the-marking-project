@@ -1,3 +1,4 @@
+
 import os
 from flask import Flask, jsonify, send_from_directory
 import psycopg2
@@ -9,6 +10,7 @@ CORS(app) # Allows the frontend to communicate with the backend
 
 def get_db_connection():
     """Establishes a connection to the database."""
+    # Use DATABASEURL key, which was corrected for Render
     conn = psycopg2.connect(os.environ.get('DATABASEURL'))
     return conn
 
@@ -83,197 +85,8 @@ def serve_index():
 
 @app.route('/<path:path>')
 def serve_static(path):
+    # This will serve style.css and script.js
     return send_from_directory('.', path)
 
 if __name__ == '__main__':
     app.run(debug=False, host='0.0.0.0')
-</details>
-Click the green "Commit changes" button.
-Step 2: Update script.js
-Go back to your GitHub repository.
-Click on the script.js file.
-Click the pencil icon (✏️) to edit it.
-Delete all the old code in the text box.
-Paste in this new, corrected code:
-<details>
-<summary>Click here for the new script.js code</summary>
-code
-JavaScript
-// This is the full JavaScript for the frontend.
-const contentArea = document.getElementById('content-area');
-const mainTitle = document.getElementById('main-title');
-
-// --- ROUTING ---
-function router() {
-    const path = window.location.hash.slice(1) || '/';
-    const params = path.split('/');
-
-    if (path === '/') {
-        loadHomePage();
-    } else if (params[1] === 'subjects' && params.length === 3) {
-        loadEssayListPage(params[2]);
-    } else if (params[1] === 'essays' && params.length === 3) {
-        loadMarkingToolPage(params[2]);
-    } else {
-        contentArea.innerHTML = '<h2>404 - Page Not Found</h2>';
-    }
-}
-
-// --- API HELPER ---
-async function fetchData(url) {
-    try {
-        // Note: We no longer need a base URL because the frontend and backend are served from the same place.
-        const response = await fetch(url);
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        return await response.json();
-    } catch (error) {
-        console.error(`Failed to fetch from ${url}:`, error);
-        throw error;
-    }
-}
-
-
-// --- PAGE LOADERS ---
-async function loadHomePage() {
-    mainTitle.innerHTML = `<a href="/">TheMarkingProject</a>`;
-    contentArea.innerHTML = '<div class="placeholder-box"><h2>Loading Subjects...</h2></div>';
-    try {
-        const subjects = await fetchData('/api/subjects');
-        let html = '<h3>Choose a subject to begin:</h3><div class="subject-list">';
-        subjects.forEach(subject => {
-            html += `<div onclick="navigateTo('/subjects/${subject.id}')"><h2>${subject.name}</h2></div>`;
-        });
-        html += '</div>';
-        contentArea.innerHTML = html;
-    } catch (error) {
-        contentArea.innerHTML = '<div class="placeholder-box"><h2>Error loading subjects. Please try again later.</h2></div>';
-    }
-}
-
-async function loadEssayListPage(subjectId) {
-    contentArea.innerHTML = '<div class="placeholder-box"><h2>Loading Essays...</h2></div>';
-    try {
-        const data = await fetchData(`/api/essays/subject/${subjectId}`);
-        mainTitle.innerHTML = `<a href="/">${data.subject_name} Essays</a>`;
-        let html = `<a href="#" onclick="navigateTo('/')" class="back-link">&larr; Back to Subjects</a>`;
-        if (data.essays.length === 0) {
-            html += '<p>No essays found for this subject yet.</p>';
-        } else {
-            data.essays.forEach(essay => {
-                html += `
-                    <div class="essay-card" onclick="navigateTo('/essays/${essay.id}')">
-                        <div class="essay-card-content">
-                            <h2>${essay.title}</h2>
-                            <p>${essay.description || ''}</p>
-                            <div class="meta-tags">
-                                <span>${essay.qualification || ''}</span>
-                                <span>${essay.exam_board || ''}</span>
-                                <span>${essay.response_count} examples available</span>
-                            </div>
-                        </div>
-                    </div>
-                `;
-            });
-        }
-        contentArea.innerHTML = html;
-    } catch (error) {
-        contentArea.innerHTML = '<div class="placeholder-box"><h2>Error loading essays. Please try again later.</h2></div>';
-    }
-}
-
-async function loadMarkingToolPage(essayId) {
-    contentArea.innerHTML = '<div class="placeholder-box"><h2>Loading Marking Tool...</h2></div>';
-    try {
-        const essay = await fetchData(`/api/essays/${essayId}`);
-        mainTitle.innerHTML = `<a href="/">${essay.title}</a>`;
-        let studentOptions = '<option value="">-- Choose a student --</option>';
-        essay.responses.forEach((resp, index) => {
-            studentOptions += `<option value="${index}">${resp.student_name} (${resp.grade}/${essay.total_marks} marks)</option>`;
-        });
-        const html = `
-            <a href="#" onclick="navigateTo('/subjects/${essay.subject.id}')" class="back-link">&larr; Back to Essay List</a>
-            <div class="overview-section">
-                <h3>Essay Details</h3>
-                <div class="question-box">
-                    <div class="question-text">${essay.full_question}</div>
-                    <div class="question-marks">${essay.mark_scheme || ''}</div>
-                </div>
-                <div class="batch-info">
-                    <div class="info-card"><strong>Total Marks:</strong><br>${essay.total_marks}</div>
-                    <div class="info-card"><strong>Class Average:</strong><br>${essay.average_grade.toFixed(1)}/${essay.total_marks}</div>
-                </div>
-            </div>
-            <div class="student-selector">
-                <label for="student-dropdown">Select Student to View Marked Work:</label>
-                <select id="student-dropdown">${studentOptions}</select>
-            </div>
-            <div id="students-container">
-                 <div class="placeholder-box">
-                    <p>Please select a student from the dropdown to see their work.</p>
-                </div>
-            </div>
-        `;
-        contentArea.innerHTML = html;
-        const dropdown = document.getElementById('student-dropdown');
-        dropdown.addEventListener('change', () => showStudent(essay.responses, essay.total_marks));
-    } catch (error) {
-        contentArea.innerHTML = '<div class="placeholder-box"><h2>Error loading marking tool. Please try again later.</h2></div>';
-    }
-}
-
-function showStudent(responses, totalMarks) {
-    const dropdown = document.getElementById('student-dropdown');
-    const selectedIndex = dropdown.value;
-    const container = document.getElementById('students-container');
-    if (selectedIndex === "") {
-        container.innerHTML = `<div class="placeholder-box"><p>Please select a student from the dropdown to see their work.</p></div>`;
-        return;
-    }
-    const studentData = responses[selectedIndex];
-    let answerHtml = studentData.full_text;
-    if (studentData.highlights) {
-        // A simple, non-overlapping replace. More robust parsing might be needed for complex cases.
-        const sortedHighlights = studentData.highlights.sort((a, b) => a.text.length - b.text.length);
-        sortedHighlights.forEach(h => {
-            const regex = new RegExp(h.text.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&'), 'g');
-            answerHtml = answerHtml.replace(regex, 
-                `<span class="highlight highlight-${h.type}">${h.text}<span class="comment">${h.comment}</span></span>`
-            );
-        });
-    }
-    let strengthsHtml = studentData.feedback.strengths.map(s => `<li>${s}</li>`).join('');
-    let improvementsHtml = studentData.feedback.improvements.map(i => `<li>${i}</li>`).join('');
-    const studentHtml = `
-        <div class="student-work active">
-            <div class="student-header">
-                ${studentData.student_name} - Candidate: ${studentData.candidate_number} - Grade: ${studentData.grade}/${totalMarks}
-            </div>
-            <div class="student-content">
-                <div class="answer-section">
-                    <div class="answer-header">Student Response:</div>
-                    <div class="student-answer">${answerHtml}</div>
-                </div>
-                <div class="feedback-section">
-                    <div class="feedback-header">Detailed Feedback</div>
-                    <div class="feedback-grid">
-                        <div class="feedback-column strengths"><h4>✅ Strengths</h4><ul>${strengthsHtml}</ul></div>
-                        <div class="feedback-column improvements"><h4>🔄 Areas for Improvement</h4><ul>${improvementsHtml}</ul></div>
-                    </div>
-                    <div class="next-steps"><strong>Next Steps:</strong> ${studentData.feedback.next_steps}</div>
-                    <div class="grade-box">Grade: ${studentData.grade}/${totalMarks} marks</div>
-                </div>
-            </div>
-        </div>`;
-    container.innerHTML = studentHtml;
-}
-
-// --- NAVIGATION ---
-function navigateTo(path) {
-    window.location.hash = path;
-}
-
-window.addEventListener('hashchange', router);
-// Initial load
-router();
